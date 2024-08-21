@@ -3,6 +3,8 @@ const audio = document.getElementById('audio');
 const playBtn = document.getElementById('playBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const seekBar = document.getElementById('seekBar');
+const uploadInput = document.getElementById('uploadInput');
+const uploadBtn = document.getElementById('uploadBtn');
 
 playBtn.addEventListener('click', () => {
     audio.play();
@@ -25,6 +27,27 @@ audio.addEventListener('timeupdate', () => {
     seekBar.value = progress;
 });
 
+uploadBtn.addEventListener('click', () => {
+  const file = uploadInput.files[0];
+  if (file) {
+    const formData = new FormData();
+    formData.append('song', file);
+
+    fetch('/upload', {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => response.text())
+    .then(message => {
+      console.log(message);
+      socket.emit('newSong', file.name);
+    })
+    .catch(error => {
+      console.error('Error uploading file:', error);
+    });
+  }
+});
+
 socket.on('play', () => {
     audio.play();
 });
@@ -35,4 +58,9 @@ socket.on('pause', () => {
 
 socket.on('seek', (time) => {
     audio.currentTime = time;
+});
+
+socket.on('newSong', (filename) => {
+  audio.src = `/music/${filename}`;
+  audio.load();
 });
