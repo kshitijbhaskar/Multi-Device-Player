@@ -26,17 +26,25 @@
             font-size: 16px;
         }
     </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.3.2/uuidv4.min.js"></script>
 </head>
 <body>
     <div id="player">
-        <audio id="audio" src="/music/song.mp3"></audio>
+        <audio id="audio" src="/music/LedZepplin-StairwayToHeaven.mp3"></audio>
         <button id="playBtn">Play</button>
         <button id="pauseBtn">Pause</button>
         <input type="range" id="seekBar" min="0" max="100" value="0">
+        <button id="resyncBtn">Resync</button>
         <input type="file" id="uploadInput" accept="audio/*">
         <button id="uploadBtn">Upload</button>
     </div>
+    <div id="webrtc-container">
+        <button id="createRoomBtn">Create Room</button>
+        <input type="text" id="roomIdInput" placeholder="Enter Room ID">
+        <button id="joinRoomBtn">Join Room</button>
+        <div id="webrtc-status"></div>
+    </div>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="script.js"></script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>

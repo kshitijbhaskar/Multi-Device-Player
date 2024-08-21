@@ -37,31 +37,90 @@ app.post('/upload', upload.single('song'), (req, res) => {
   io.emit('newSong', req.file.filename);
 });
 
-// Store connected clients
-const clients = new Set();
+let rooms = {};
 
 io.on('connection', (socket) => {
-  console.log('New client connected');
-  clients.add(socket);
+  console.log('a user connected');
+
+  socket.on('join-room', (roomId) => {
+    console.log(`User joined room ${roomId}`);
+    socket.join(roomId);
+
+    if (!rooms[roomId]) {
+      rooms[roomId] = {
+        audioState: {
+          paused: true,
+          currentTime: 0,
+          lastUpdateTime: Date.now()
+        },
+        clients: []
+      };
+    }
+
+    rooms[roomId].clients.push(socket.id);
+
+    // Send current audio state and clock time to the new client
+    socket.emit('audio-state', rooms[roomId].audioState);
+  });
+
+
+  socket.on('play', (roomId) => {
+    console.log('Received play event');
+    if (rooms[roomId]) {
+      rooms[roomId].audioState.paused = false;
+      rooms[roomId].audioState.lastUpdateTime = Date.now();
+      io.to(roomId).emit('play', rooms[roomId].audioState);
+    }
+  });
+
+  socket.on('pause', (roomId) => {
+    console.log('Received pause event');
+    if (rooms[roomId]) {
+      rooms[roomId].audioState.paused = true;
+      rooms[roomId].audioState.lastUpdateTime = Date.now();
+      io.to(roomId).emit('pause', rooms[roomId].audioState);
+    }
+  });
+
+  socket.on('seek', (time, roomId) => {
+    console.log(`Received seek event to time: ${time}`);
+    if (rooms[roomId]) {
+      rooms[roomId].audioState.currentTime = time;
+      rooms[roomId].audioState.lastUpdateTime = Date.now();
+      io.to(roomId).emit('seek', rooms[roomId].audioState);
+    }
+  });
+
+  socket.on('sync-request', (roomId) => {
+    if (rooms[roomId]) {
+      const elapsedTimeSinceUpdate = Math.max(0, Date.now() - rooms[roomId].audioState.lastUpdateTime) / 1000;
+      const currentTime = rooms[roomId].audioState.paused
+        ? rooms[roomId].audioState.currentTime
+        : rooms[roomId].audioState.currentTime + elapsedTimeSinceUpdate;
+  
+      // Adjust for average network latency, assuming you have a way to measure it
+      const averageLatencyInSeconds = 0.1; // Example value, measure and adjust accordingly
+      const adjustedCurrentTime = currentTime + averageLatencyInSeconds;
+  
+      socket.emit('sync-response', {
+        ...rooms[roomId].audioState,
+        currentTime: adjustedCurrentTime
+      });
+    }
+  });
+  
 
   socket.on('disconnect', () => {
-    console.log('Client disconnected');
-    clients.delete(socket);
-  });
-
-  socket.on('play', () => {
-    io.emit('play');
-  });
-
-  socket.on('pause', () => {
-    io.emit('pause');
-  });
-
-  socket.on('seek', (time) => {
-    io.emit('seek', time);
+    console.log('user disconnected');
+    for (const roomId in rooms) {
+      rooms[roomId].clients = rooms[roomId].clients.filter(clientId => clientId !== socket.id);
+      if (rooms[roomId].clients.length === 0) {
+        delete rooms[roomId];
+      }
+    }
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+server.listen(3000, () => {
+  console.log('Server listening on port 3000');
 });
