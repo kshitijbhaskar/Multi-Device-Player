@@ -1,5 +1,5 @@
 const socket = io();
-const audio = document.getElementById('audio');
+const audio = new Audio();
 const playBtn = document.getElementById('playBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const seekBar = document.getElementById('seekBar');
@@ -20,6 +20,7 @@ createRoomBtn.addEventListener('click', () => {
   currentRoomId = roomId;
   socket.emit('join-room', roomId);
   webrtcStatus.textContent = `Room ID: ${roomId}`;
+  fetchAndDisplaySongs();
 });
 
 joinRoomBtn.addEventListener('click', () => {
@@ -27,6 +28,7 @@ joinRoomBtn.addEventListener('click', () => {
   currentRoomId = roomId;
   socket.emit('join-room', roomId);
   webrtcStatus.textContent = `Joined room: ${roomId}`;
+  fetchAndDisplaySongs();
 });
 
 playBtn.addEventListener('click', () => {
@@ -59,7 +61,7 @@ uploadBtn.addEventListener('click', () => {
     .then(response => response.text())
     .then(message => {
       console.log(message);
-      socket.emit('newSong', file.name);
+      socket.emit('newSong', file.name, currentRoomId);
     })
     .catch(error => {
       console.error('Error uploading file:', error);
@@ -90,27 +92,29 @@ socket.on('seek', (state) => {
 });
 
 function adjustPlaybackRateSmoothly(targetTime) {
-    const timeDifference = targetTime - audio.currentTime;
-    const adjustmentFactor = 0.2; // Adjust this value to control the correction smoothness
-  
-    if (Math.abs(timeDifference) > 0.05) { // Only adjust if the difference is significant
-      audio.playbackRate = 1 + (timeDifference * adjustmentFactor);
-    } else {
-      audio.playbackRate = 1;
-    }
-  }
-  
-  socket.on('sync-response', (state) => {
-    if (isFinite(state.currentTime) && state.currentTime >= 0 && state.currentTime <= audio.duration) {
-      adjustPlaybackRateSmoothly(state.currentTime);
-    }
-  });
-  
+  const timeDifference = targetTime - audio.currentTime;
+  const adjustmentFactor = 0.2; // Adjust this value to control the correction smoothness
 
-socket.on('newSong', (filename) => {
-  audio.src = `/music/${filename}`;
-  audio.load();
-  audio.play();
+  if (Math.abs(timeDifference) > 0.05) { // Only adjust if the difference is significant
+    audio.playbackRate = 1 + (timeDifference * adjustmentFactor);
+  } else {
+    audio.playbackRate = 1;
+  }
+}
+
+socket.on('sync-response', (state) => {
+  if (isFinite(state.currentTime) && state.currentTime >= 0 && state.currentTime <= audio.duration) {
+    adjustPlaybackRateSmoothly(state.currentTime);
+  }
+});
+
+socket.on('newSong', (filename, roomId) => {
+  if (roomId === currentRoomId) {
+    audio.src = `/music/${filename}`;
+    audio.load();
+    audio.play().catch(e => console.error("Error playing audio:", e));
+  }
+  fetchAndDisplaySongs(); // Refresh the song list
 });
 
 function updateAudioState(state) {
@@ -135,3 +139,30 @@ setInterval(() => {
 audio.addEventListener('timeupdate', () => {
   seekBar.value = (audio.currentTime / audio.duration) * 100;
 });
+
+// Function to fetch and display songs
+function fetchAndDisplaySongs() {
+  fetch('/available-songs')
+    .then(response => response.json())
+    .then(songs => {
+      const songList = document.getElementById('songList');
+      songList.innerHTML = '';
+      songs.forEach(song => {
+        const li = document.createElement('li');
+        li.textContent = song;
+        li.addEventListener('click', () => playSong(song));
+        songList.appendChild(li);
+      });
+    })
+    .catch(error => console.error('Error fetching songs:', error));
+}
+
+function playSong(songName) {
+  audio.src = `/music/${songName}`;
+  audio.load();
+  audio.play().catch(e => console.error("Error playing audio:", e));
+  socket.emit('newSong', songName, currentRoomId);
+}
+
+// Call this function when the page loads
+document.addEventListener('DOMContentLoaded', fetchAndDisplaySongs);

@@ -3,6 +3,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -21,6 +22,12 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// Function to get available songs
+function getAvailableSongs() {
+  const musicDir = path.join(__dirname, '../music');
+  return fs.readdirSync(musicDir);
+}
+
 // Serve static files from the client directory
 app.use(express.static(path.join(__dirname, '../client')));
 
@@ -34,7 +41,15 @@ app.post('/upload', upload.single('song'), (req, res) => {
   }
   console.log(`File uploaded: ${req.file.filename}`);
   res.send(`File uploaded: ${req.file.filename}`);
-  io.emit('newSong', req.file.filename);
+  // Broadcast to all rooms since we don't know which room uploaded the file
+  Object.keys(rooms).forEach(roomId => {
+    io.to(roomId).emit('newSong', req.file.filename, roomId);
+  });
+});
+
+// Serve list of available songs
+app.get('/available-songs', (req, res) => {
+  res.json(getAvailableSongs());
 });
 
 let rooms = {};
@@ -62,7 +77,6 @@ io.on('connection', (socket) => {
     // Send current audio state and clock time to the new client
     socket.emit('audio-state', rooms[roomId].audioState);
   });
-
 
   socket.on('play', (roomId) => {
     console.log('Received play event');
@@ -108,7 +122,15 @@ io.on('connection', (socket) => {
       });
     }
   });
-  
+
+  socket.on('newSong', (filename, roomId) => {
+    if (rooms[roomId]) {
+      rooms[roomId].audioState.currentTime = 0;
+      rooms[roomId].audioState.paused = false;
+      rooms[roomId].audioState.lastUpdateTime = Date.now();
+      io.to(roomId).emit('newSong', filename, roomId);
+    }
+  });
 
   socket.on('disconnect', () => {
     console.log('user disconnected');
