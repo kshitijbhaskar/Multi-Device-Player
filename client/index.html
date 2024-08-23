@@ -3,97 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-Device Music Player</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
-            padding: 20px;
-            box-sizing: border-box;
-        }
-
-        #player, #playlist, #webrtc-container {
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-            width: 100%;
-            max-width: 600px;
-        }
-
-        button {
-            margin: 5px;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        #seekBar {
-            width: 100%;
-            margin: 10px 0;
-        }
-
-        input[type="file"] {
-            display: block;
-            margin: 10px 0;
-        }
-
-        @media (max-width: 600px) {
-            button {
-                font-size: 14px;
-                padding: 8px 16px;
-            }
-
-            #seekBar {
-                margin: 8px 0;
-            }
-        }
-
-        @media (min-width: 601px) {
-            #player {
-                justify-content: space-around;
-                flex-wrap: wrap;
-                flex-direction: row;
-            }
-
-            #player > * {
-                margin: 5px 0;
-            }
-
-            #playlist, #webrtc-container {
-                width: 100%;
-                max-width: 600px;
-            }
-        }
-    </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.3.2/uuidv4.min.js"></script>
+    <title>Synchronized YouTube Player</title>
 </head>
 <body>
-    <div id="player">
-        <button id="playBtn">Play</button>
-        <button id="pauseBtn">Pause</button>
-        <input type="range" id="seekBar" min="0" max="100" value="0">
-        <button id="resyncBtn">Resync</button>
-        <input type="file" id="uploadInput" accept="audio/*">
-        <button id="uploadBtn">Upload</button>
-    </div>
-    <div id="playlist">
-        <h3>Playlist</h3>
-        <ul id="songList"></ul>
-    </div>
-    <div id="webrtc-container">
-        <button id="createRoomBtn">Create Room</button>
+    <div id="roomControls">
         <input type="text" id="roomIdInput" placeholder="Enter Room ID">
+        <button id="createRoomBtn">Create Room</button>
         <button id="joinRoomBtn">Join Room</button>
-        <div id="webrtc-status"></div>
+        <p id="roomInfo"></p>
     </div>
-    <script src="/socket.io/socket.io.js"></script>
-    <script type="module" src="script.js"></script>
+
+    <div id="player"></div>
+
+    <div id="videoSearch">
+        <input type="text" id="searchInput" placeholder="Search for a video">
+        <button id="searchBtn">Search</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="script.js"></script>
 </body>
 </html>
