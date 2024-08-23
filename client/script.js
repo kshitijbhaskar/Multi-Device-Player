@@ -8,8 +8,8 @@ const createRoomBtn = document.getElementById('createRoomBtn');
 const joinRoomBtn = document.getElementById('joinRoomBtn');
 const roomIdInput = document.getElementById('roomIdInput');
 const webrtcStatus = document.getElementById('webrtc-status');
-const uploadInput = document.getElementById('uploadInput');
-const uploadBtn = document.getElementById('uploadBtn');
+const searchInput = document.getElementById('searchInput');
+const searchBtn = document.getElementById('searchBtn');
 
 let currentRoomId;
 let lastSyncTime = 0;
@@ -20,7 +20,6 @@ createRoomBtn.addEventListener('click', () => {
   currentRoomId = roomId;
   socket.emit('join-room', roomId);
   webrtcStatus.textContent = `Room ID: ${roomId}`;
-  fetchAndDisplaySongs();
 });
 
 joinRoomBtn.addEventListener('click', () => {
@@ -28,7 +27,6 @@ joinRoomBtn.addEventListener('click', () => {
   currentRoomId = roomId;
   socket.emit('join-room', roomId);
   webrtcStatus.textContent = `Joined room: ${roomId}`;
-  fetchAndDisplaySongs();
 });
 
 playBtn.addEventListener('click', () => {
@@ -48,26 +46,27 @@ resyncBtn.addEventListener('click', () => {
   requestSync();
 });
 
-uploadBtn.addEventListener('click', () => {
-  const file = uploadInput.files[0];
-  if (file) {
-    const formData = new FormData();
-    formData.append('song', file);
-
-    fetch('/upload', {
-      method: 'POST',
-      body: formData
-    })
-    .then(response => response.text())
-    .then(message => {
-      console.log(message);
-      socket.emit('newSong', file.name, currentRoomId);
-    })
-    .catch(error => {
-      console.error('Error uploading file:', error);
-    });
-  }
+searchBtn.addEventListener('click', () => {
+  const query = searchInput.value;
+  fetchAndDisplaySongs(query);
 });
+
+// Modify the fetchAndDisplaySongs function to accept a query parameter
+function fetchAndDisplaySongs(query = '') {
+  fetch(`https://api.jamendo.com/v3.0/tracks/?client_id=c4819668&format=jsonpretty&limit=20&search=${query}`)
+    .then(response => response.json())
+    .then(data => {
+      const songList = document.getElementById('songList');
+      songList.innerHTML = '';
+      data.results.forEach(song => {
+        const li = document.createElement('li');
+        li.textContent = song.name;
+        li.addEventListener('click', () => playSong(song.audio));
+        songList.appendChild(li);
+      });
+    })
+    .catch(error => console.error('Error fetching songs:', error));
+}
 
 function requestSync() {
   socket.emit('sync-request', currentRoomId);
@@ -108,13 +107,12 @@ socket.on('sync-response', (state) => {
   }
 });
 
-socket.on('newSong', (filename, roomId) => {
+socket.on('newSong', (songUrl, roomId) => {
   if (roomId === currentRoomId) {
-    audio.src = `/music/${filename}`;
+    audio.src = songUrl;
     audio.load();
     audio.play().catch(e => console.error("Error playing audio:", e));
   }
-  fetchAndDisplaySongs(); // Refresh the song list
 });
 
 function updateAudioState(state) {
@@ -140,29 +138,10 @@ audio.addEventListener('timeupdate', () => {
   seekBar.value = (audio.currentTime / audio.duration) * 100;
 });
 
-// Function to fetch and display songs
-function fetchAndDisplaySongs() {
-  fetch('/available-songs')
-    .then(response => response.json())
-    .then(songs => {
-      const songList = document.getElementById('songList');
-      songList.innerHTML = '';
-      songs.forEach(song => {
-        const li = document.createElement('li');
-        li.textContent = song;
-        li.addEventListener('click', () => playSong(song));
-        songList.appendChild(li);
-      });
-    })
-    .catch(error => console.error('Error fetching songs:', error));
-}
-
-function playSong(songName) {
-  audio.src = `/music/${songName}`;
+function playSong(songUrl) {
+  audio.src = songUrl;
   audio.load();
   audio.play().catch(e => console.error("Error playing audio:", e));
-  socket.emit('newSong', songName, currentRoomId);
+  socket.emit('newSong', songUrl, currentRoomId);
 }
 
-// Call this function when the page loads
-document.addEventListener('DOMContentLoaded', fetchAndDisplaySongs);

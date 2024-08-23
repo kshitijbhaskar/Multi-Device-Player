@@ -2,8 +2,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
-const multer = require('multer');
-const fs = require('fs');
+const axios = require('axios');
 
 const app = express();
 const server = http.createServer(app);
@@ -11,45 +10,24 @@ const io = socketIo(server);
 
 const PORT = process.env.PORT || 3000;
 
-// Set up Multer storage configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../music/'));
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.originalname);
-  }
-});
-const upload = multer({ storage });
-
-// Function to get available songs
-function getAvailableSongs() {
-  const musicDir = path.join(__dirname, '../music');
-  return fs.readdirSync(musicDir);
-}
-
 // Serve static files from the client directory
 app.use(express.static(path.join(__dirname, '../client')));
 
-// Serve music files
-app.use('/music', express.static(path.join(__dirname, '../music')));
-
-// Handle file upload
-app.post('/upload', upload.single('song'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).send('No file uploaded');
+// Function to get available songs from the Jamendo API
+async function getAvailableSongs() {
+  try {
+    const response = await axios.get('https://api.jamendo.com/v3.0/tracks/?client_id=YOUR_CLIENT_ID&format=jsonpretty&limit=20');
+    return response.data.results.map(song => ({ name: song.name, url: song.audio }));
+  } catch (error) {
+    console.error('Error fetching songs:', error);
+    return [];
   }
-  console.log(`File uploaded: ${req.file.filename}`);
-  res.send(`File uploaded: ${req.file.filename}`);
-  // Broadcast to all rooms since we don't know which room uploaded the file
-  Object.keys(rooms).forEach(roomId => {
-    io.to(roomId).emit('newSong', req.file.filename, roomId);
-  });
-});
+}
 
 // Serve list of available songs
-app.get('/available-songs', (req, res) => {
-  res.json(getAvailableSongs());
+app.get('/available-songs', async (req, res) => {
+  const songs = await getAvailableSongs();
+  res.json(songs);
 });
 
 let rooms = {};
@@ -111,11 +89,11 @@ io.on('connection', (socket) => {
       const currentTime = rooms[roomId].audioState.paused
         ? rooms[roomId].audioState.currentTime
         : rooms[roomId].audioState.currentTime + elapsedTimeSinceUpdate;
-  
+
       // Adjust for average network latency, assuming you have a way to measure it
       const averageLatencyInSeconds = 0.1; // Example value, measure and adjust accordingly
       const adjustedCurrentTime = currentTime + averageLatencyInSeconds;
-  
+
       socket.emit('sync-response', {
         ...rooms[roomId].audioState,
         currentTime: adjustedCurrentTime
@@ -123,12 +101,12 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('newSong', (filename, roomId) => {
+  socket.on('newSong', (songUrl, roomId) => {
     if (rooms[roomId]) {
       rooms[roomId].audioState.currentTime = 0;
       rooms[roomId].audioState.paused = false;
       rooms[roomId].audioState.lastUpdateTime = Date.now();
-      io.to(roomId).emit('newSong', filename, roomId);
+      io.to(roomId).emit('newSong', songUrl, roomId);
     }
   });
 
