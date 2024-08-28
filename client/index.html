@@ -61,7 +61,7 @@
                 flex-wrap: wrap;
                 flex-direction: row;
             }
-
+            
             #player > * {
                 margin: 5px 0;
             }
@@ -73,6 +73,8 @@
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.3.2/uuidv4.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="script.js"></script>
 </head>
 <body>
     <div id="player">
@@ -93,7 +95,5 @@
         <button id="joinRoomBtn">Join Room</button>
         <div id="webrtc-status"></div>
     </div>
-    <script src="/socket.io/socket.io.js"></script>
-    <script type="module" src="script.js"></script>
 </body>
 </html>
